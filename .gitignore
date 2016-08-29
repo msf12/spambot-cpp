@@ -4,6 +4,9 @@
 *.o
 *.obj
 
+deps
+config.yaml
+
 # Precompiled Headers
 *.gch
 *.pch
