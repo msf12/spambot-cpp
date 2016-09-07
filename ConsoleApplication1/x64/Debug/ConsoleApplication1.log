@@ -1,3 +1,4 @@
 ﻿  main.cpp
+d:\documents\github\spambot-cpp\consoleapplication1\src\windows_interface.h(95): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
   ConsoleApplication1.vcxproj -> D:\Documents\GitHub\spambot-cpp\ConsoleApplication1\x64\Debug\ConsoleApplication1.exe
   ConsoleApplication1.vcxproj -> D:\Documents\GitHub\spambot-cpp\ConsoleApplication1\x64\Debug\ConsoleApplication1.pdb (Full PDB)
