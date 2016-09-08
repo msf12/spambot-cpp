@@ -52,7 +52,8 @@ LRESULT CALLBACK MainWindowProc(
 
 			SendMessage(g_TextInput.handle, EM_LIMITTEXT, 4000, 0);
 
-			SetWindowSubclass(g_TextInput.handle, EditWindowProc, 0, 0);
+			SetWindowSubclass(g_TextInput.handle, InputWindowProc, 0, 0);
+			SetWindowSubclass(g_TextOutput.handle, OutputWindowProc, 0, 0);
 		} break;
 		case WM_SETFOCUS:
 		{
@@ -95,7 +96,7 @@ BOOL CALLBACK EnumWindowProc(
 	return true;
 }
 
-LRESULT CALLBACK EditWindowProc(
+LRESULT CALLBACK InputWindowProc(
   _In_ HWND   Window,
   _In_ UINT   Message,
   _In_ WPARAM wParam,
@@ -122,13 +123,41 @@ LRESULT CALLBACK EditWindowProc(
 				return 0;
 			}
 		}
-		case WM_KILLFOCUS:
+		//case WM_KILLFOCUS:
+		//{
+			//if((HWND)wParam == g_TextOutput.handle)
+			//{
+				//SetFocus(g_TextInput.handle);
+			//}
+		//}
+		default:
 		{
-			if((HWND)wParam == g_TextOutput.handle)
-			{
-				SetFocus(g_TextInput.handle);
-			}
+			return DefSubclassProc(Window, Message, wParam, lParam);	
 		}
+	}
+	return 0;
+}
+
+LRESULT CALLBACK OutputWindowProc(
+  _In_ HWND   Window,
+  _In_ UINT   Message,
+  _In_ WPARAM wParam,
+  _In_ LPARAM lParam,
+  UINT_PTR uIdSubclass,
+  DWORD_PTR dwRefData
+)
+{
+	switch(Message)
+	{
+		case WM_CHAR:
+		case WM_SYSKEYDOWN:
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+		case WM_SYSKEYUP:
+		{
+			SetFocus(g_TextInput.handle);	
+			SendMessage(g_TextInput.handle, Message, wParam, lParam);
+		} break;
 		default:
 		{
 			return DefSubclassProc(Window, Message, wParam, lParam);	

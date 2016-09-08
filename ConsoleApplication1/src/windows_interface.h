@@ -16,7 +16,16 @@ BOOL CALLBACK EnumWindowProc(
 	_In_ LPARAM lParam
 );
 
-LRESULT CALLBACK EditWindowProc(
+LRESULT CALLBACK InputWindowProc(
+	_In_ HWND   Window,
+	_In_ UINT   Message,
+	_In_ WPARAM wParam,
+	_In_ LPARAM lParam,
+	UINT_PTR uIdSubclass,
+	DWORD_PTR dwRefData
+);
+
+LRESULT CALLBACK OutputWindowProc(
 	_In_ HWND   Window,
 	_In_ UINT   Message,
 	_In_ WPARAM wParam,

@@ -1,4 +1,11 @@
-﻿  main.cpp
-d:\documents\github\spambot-cpp\consoleapplication1\src\windows_interface.h(95): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+﻿  windows_interface.cpp
+d:\documents\github\spambot-cpp\consoleapplication1\src\windows_interface.h(104): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+d:\documents\github\spambot-cpp\consoleapplication1\src\windows_interface.cpp(40): warning C4312: 'type cast': conversion from 'LONG' to 'HINSTANCE' of greater size
+d:\documents\github\spambot-cpp\consoleapplication1\src\windows_interface.cpp(51): warning C4312: 'type cast': conversion from 'LONG' to 'HINSTANCE' of greater size
+  Generating Code...
+  Compiling...
+  main.cpp
+d:\documents\github\spambot-cpp\consoleapplication1\src\windows_interface.h(104): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+  Generating Code...
   ConsoleApplication1.vcxproj -> D:\Documents\GitHub\spambot-cpp\ConsoleApplication1\x64\Debug\ConsoleApplication1.exe
   ConsoleApplication1.vcxproj -> D:\Documents\GitHub\spambot-cpp\ConsoleApplication1\x64\Debug\ConsoleApplication1.pdb (Full PDB)
