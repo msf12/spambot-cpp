@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "globals.h"
 
 string OWNER;
@@ -44,6 +43,7 @@ wstring TextWindowBuffer::to_serial_string()
 
 std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> StringToWString;
 
+// TODO: move to win32 platform layer
 void print_debug(char output[], bool error)
 {
 	static HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);

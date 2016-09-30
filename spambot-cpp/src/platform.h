@@ -1,37 +1,19 @@
 #pragma once
+#include "spambot.h"
 
-void BotMain();
-void MessageHandler(void *args);
-void FollowerHandler(void *args);
-void UserInputHandler(void *args);
-void BotInit();
-
-PLATFORM_THREAD_WRAPPER_NO_ARGS(BotMain)
-PLATFORM_THREAD_WRAPPER(MessageHandler)
-PLATFORM_THREAD_WRAPPER(FollowerHandler)
-PLATFORM_THREAD_WRAPPER(UserInputHandler)
-
-void lock(void *mutex, unsigned long mstimeout = INFINITE);
+void lock(void *mutex, unsigned long timeout);
 void release(void *mutex);
 void *InitMutex();
 void *spawn_thread(void *fptr, void *args);
 
-void lock(void *mutex, unsigned long mstimeout = INFINITE)
-{
-	WaitForSingleObject(mutex, mstimeout);
-}
+PLATFORM_THREAD_WRAPPER_NO_ARGS(BotMain)
+PLATFORM_THREAD_WRAPPER(MessageHandler)
+#if 0
+PLATFORM_THREAD_WRAPPER(FollowerHandler)
+#endif
+PLATFORM_THREAD_WRAPPER(UserInputHandler)
 
-void release(void *mutex)
-{
-	ReleaseMutex(mutex);
-}
+wstring GetWStringInput();
+string GetStringInput();
 
-void *InitMutex()
-{
-	return CreateMutex(0, 0, nullptr);
-}
-
-void *spawn_thread(void *fptr, void *args)
-{
-	return CreateThread(0, 0, (DWORD(*)(void *)) fptr, args, 0, 0);
-}
+void WriteToGUIIn(wchar_t *output);

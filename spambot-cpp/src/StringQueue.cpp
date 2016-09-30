@@ -2,7 +2,7 @@
 
 void StringQueue::enqueue(string data)
 {
-	if (size)
+	if(size)
 	{
 		tail->next = new Node;
 		tail = tail->next;
@@ -19,7 +19,7 @@ void StringQueue::enqueue(string data)
 
 string StringQueue::dequeue()
 {
-	if (size)
+	if(size)
 	{
 		Node *temp = head;
 		string result = temp->data;
@@ -36,7 +36,7 @@ string StringQueue::dequeue()
 
 StringQueue::~StringQueue()
 {
-	while (size)
+	while(size)
 	{
 		Node *temp = head;
 		head = head->next;

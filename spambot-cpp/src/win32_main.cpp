@@ -1,9 +1,17 @@
-#include "stdafx.h"
-#include <sys/stat.h>
-#include <errno.h>
-#include "globals.h"
-#include "win32_interface.h"
-#include "spambot.h"
+#include <winsock2.h>
+#include <Windows.h>
+#include <Commctrl.h>
+#include "globals.cpp"
+#include "win32_callbacks.cpp"
+#include "win32_platform.cpp"
+#include "spambot.cpp"
+//#include <sys/stat.h>
+//#include <stdlib.h>
+//#include <crtdbg.h>
+//#include <stdlib.h>
+//#include <tchar.h>
+//#include <string.h>
+//#include <errno.h>
 
 using namespace std;
 
@@ -52,13 +60,13 @@ int CALLBACK WinMain(
 
 	if(!WindowHandle)
 	{
-		auto err = GetLastError();
+		//auto err = GetLastError();
 	}
 
 	ShowWindow(WindowHandle, nCmdShow);
 	UpdateWindow(WindowHandle);
 
-	LPDWORD ThreadIDPtr{};
+	//LPDWORD ThreadIDPtr{};
 	CreateThread(0, 0, PLATFORM_WRAPPER_NAME(BotMain), 0, 0, 0);
 
 
@@ -72,15 +80,7 @@ int CALLBACK WinMain(
 
 	OutputDebugString(g_OutputStringBuffer.to_serial_string().c_str());
 
-	/*
-	* TODO: the main loop of the program starts here
-	* it should accept user input of two varieties
-	* 1. plain text strings of arbitrary length to be sent to the chat via the bot
-	* 2. commands (denoted by starting with !) which are executed directly by the bot
-	*/
-
-
-	write(L"Bot terminated. ");
+	WriteToGUIOut(L"Bot terminated. ");
 	_CrtDumpMemoryLeaks();
 	return 0;
 }

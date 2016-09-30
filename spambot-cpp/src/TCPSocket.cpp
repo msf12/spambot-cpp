@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "TCPSocket.h"
 
 TCPSocket::TCPSocket()
@@ -29,6 +28,11 @@ TCPSocket::~TCPSocket()
 	WSACleanup();
 }
 
+void TCPSocket::timeout(long int millis)
+{
+	setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, (char *) &millis, sizeof(millis));
+}
+
 int TCPSocket::connect(string url, string port)
 {
 	return ::connect(Socket, SockInfo->ai_addr, (int) SockInfo->ai_addrlen);
@@ -36,7 +40,7 @@ int TCPSocket::connect(string url, string port)
 
 int TCPSocket::send(string message)
 {
-	return ::send(Socket, message.c_str(), message.length(), 0);
+	return ::send(Socket, message.c_str(), (int) message.length(), 0);
 }
 
 string TCPSocket::receive()

@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "yaml-cpp/yaml.h"
 #include "TCPSocket.h"
 #include <cstdio>

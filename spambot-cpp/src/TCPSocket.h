@@ -17,6 +17,7 @@ public:
 	TCPSocket(string url, string port);
 	~TCPSocket();
 
+	void timeout(long int millis);
 	int connect(string url, string port);
 	int send(string message);
 	string receive();

@@ -1,19 +1,14 @@
 #pragma once
+#include "StringQueue.h"
 
-//TODO: migrate this to win32 platform layer
+struct ThreadQueue
+{
+	StringQueue *queue;
+	void *mutex;
+};
 
-#define PLATFORM_WRAPPER_NAME(function) Win32 ## function ## Wrapper
-
-#define PLATFORM_THREAD_WRAPPER(function)\
-DWORD WINAPI PLATFORM_WRAPPER_NAME(function) ## (LPVOID args)\
-{\
-	function(args);\
-	return 1;\
-}
-
-#define PLATFORM_THREAD_WRAPPER_NO_ARGS(function)\
-DWORD WINAPI PLATFORM_WRAPPER_NAME(function) ## (LPVOID args)\
-{\
-	function();\
-	return 1;\
-}
+void BotMain();
+void MessageHandler(void *args);
+void FollowerHandler(void *args);
+void UserInputHandler(void *args);
+void BotInit();

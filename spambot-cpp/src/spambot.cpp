@@ -1,40 +1,61 @@
-#include "stdafx.h"
-#include "globals.h"
-#include "spambot.h"
 #include "TCPSocket.h"
-#include "StringQueue.h"
-#include "platform.h"
 #include "yaml-cpp/yaml.h"
 #include <fstream>
-
-struct ThreadQueue
-{
-	StringQueue *queue;
-	void *mutex;
-};
+#include "spambot.h"
+#include "spambot_util.cpp"
 
 void BotMain()
 {
 	BotInit();
 
-	ThreadQueue Messages;
-	ThreadQueue Responses;
-	Messages.queue = new StringQueue;
-	Responses.queue = new StringQueue;
-	Messages.mutex = InitMutex();
-	Responses.mutex = InitMutex();
+	ThreadQueue *Messages = (ThreadQueue *) malloc(sizeof(ThreadQueue)*2);
+	ThreadQueue *Responses = Messages + 1;
+	Messages->queue = new StringQueue;
+	Responses->queue = new StringQueue;
+	Messages->mutex = InitMutex();
+	Responses->mutex = InitMutex();
 
-	auto MessageHandlerThread  = spawn_thread((void *) PLATFORM_WRAPPER_NAME(MessageHandler),   (void *)&Messages);
-	auto FollowerHandlerThread = spawn_thread((void *) PLATFORM_WRAPPER_NAME(FollowerHandler),  (void *)&Messages);
-	auto UserInputThread       = spawn_thread((void *) PLATFORM_WRAPPER_NAME(UserInputHandler), (void *)&Messages);
+	auto MessageHandlerThread  = spawn_thread((void *) PLATFORM_WRAPPER_NAME(MessageHandler),   (void *)Messages);
+#if 0
+	auto FollowerHandlerThread = spawn_thread((void *) PLATFORM_WRAPPER_NAME(FollowerHandler),  (void *)Messages);
+#endif
+	auto UserInputThread       = spawn_thread((void *) PLATFORM_WRAPPER_NAME(UserInputHandler), (void *)Messages);
+
 	TCPSocket Socket("irc.twitch.tv", "6667");
 
-	//Send initial connection messages and check responses for errors
+	//Send initial connection messages
+	// TODO: check responses for errors
+	Socket.timeout(1000);
+
+	WritelnToGUIOut("Sending password...");
+	Socket.send("PASS " + PASS + "\r\n");
+	Socket.receive();
+	
+	WritelnToGUIOut("Sending username...");
+	Socket.send("NICK " + NICK + "\r\n");
+	Socket.receive();
+
+	WritelnToGUIOut("Requesting message tags");
+	Socket.send("CAP REQ :twitch.tv/tags\r\n");
+	Socket.receive();
+
+	WritelnToGUIOut("Joining channel " + CHAN + "...");
+	Socket.send("JOIN #" + CHAN + "\r\n");
+	Socket.receive();
+	Socket.receive();
+
+	WritelnToGUIOut("Bot connected successfully!");
+
+	Socket.timeout(1);
+	if(SHOW_SALUTATIONS)
+	{
+		Socket.send(FormatTwitchPRIVMSG(STARTUP));
+	}
 
 	while(true)
 	{
-		//TODO: implement thread message-queue wrappers
 #if 0
+		//TODO: implement thread message-queue wrappers
 		if (GetMessageWithTimeout())
 		{
 			PostMessage(MessageHandlerThread, 1);
@@ -43,44 +64,80 @@ void BotMain()
 			GetMessage();
 			GetMessage();
 			GetMessage();
+			free(Messages);
+			//free(Responses);
+			Socket.send(FormatTwitchPRIVMSG(SHUTDOWN));
 			return;
 		}
 #endif
+		// TODO: should Socket.receive have a timeout?
 		for (auto received = Socket.receive();
 			received != "";
 			received = Socket.receive())
 		{
-			lock(Messages.mutex);
-			Messages.queue->enqueue(received);
-			release(Messages.mutex);
+			if (received == "PING")
+			{
+				Socket.send("PONG :tmi.twitch.tv\r\n");
+			}
+			else
+			{
+				lock(Messages->mutex);
+				Messages->queue->enqueue(received);
+				release(Messages->mutex);
+			}
 		}
 
+		if(Messages->queue->size)
+		{
+			lock(Responses->mutex);
+			Responses->queue->enqueue(Messages->queue->dequeue());
+			release(Responses->mutex);
+		}
+
+		if(Responses->queue->size)
+		{
+			Socket.send(FormatTwitchPRIVMSG(Responses->queue->dequeue()));
+			//WritelnToGUIOut(Responses->queue->dequeue());
+		}
+
+#if 0
 		if (/*enough time has passed to rate-limit responses*/) //TODO: check if bot is mod in the channel???
 		{
 			lock(Responses.mutex);
 			Socket.send(Responses.queue->dequeue());
 			release(Responses.mutex);
 		}
+#endif
 	}
 }
 
 void MessageHandler(void *args)
 {
 	ThreadQueue *Messages = (ThreadQueue *)args;
+	ThreadQueue *Responses = (ThreadQueue *)(Messages + 1);
 	StringQueue *MessageQueue = Messages->queue;
-	ThreadQueue *Responses = Messages + 1;
 	StringQueue *ResponseQueue = Responses->queue;
 
-	while (true)
+	while(true)
 	{
-		//TODO: check for BotMain shutdown message
-		while (MessageQueue->size > 0)
+		// TODO: check for BotMain shutdown message
+		// TODO: use User input to activate commands
+		while(MessageQueue->size > 0)
 		{
 			lock(Messages->mutex);
 			auto message = MessageQueue->dequeue();
 			release(Messages->mutex);
 
-			auto response = "";// = ChooseResponse(message);
+			auto response = message;// = ChooseResponse(message);
+			if(response[0] == 'U')
+			{
+				response = response.substr(1);
+			}
+			else
+			{
+				WritelnToGUIOut(response);
+				continue;
+			}
 
 			lock(Responses->mutex);
 			ResponseQueue->enqueue(response);
@@ -89,6 +146,7 @@ void MessageHandler(void *args)
 	}
 }
 
+#if 0
 void FollowerHandler(void *args)
 {
 	ThreadQueue *Messages = (ThreadQueue *)args;
@@ -96,12 +154,12 @@ void FollowerHandler(void *args)
 	auto LastNewFollowerTime = GetMostRecentFollowTime();
 
 	//TODO: figure out message timings vs check timings
-	while (true)
+	while(true)
 	{
 		//TODO: check for BotMain shutdown message
 		auto NewFollowers = GetNewFollowers(LastNewFollowerTime);
 		LastNewFollowerTime = NewFollowers[0].GetField("updated_at");
-		for (auto follower : NewFollowers)
+		for(auto follower : NewFollowers)
 		{
 			lock(Messages->mutex);
 			Messages->queue->enqueue("New follower message");
@@ -109,32 +167,36 @@ void FollowerHandler(void *args)
 		//Sleep(/*1 minute*/); //TODO: determine ideal thread sleep time between follower checks
 	}
 }
+#endif
 
 void UserInputHandler(void *args)
 {
 	ThreadQueue *Messages = (ThreadQueue *)args;
 
-	while (true)
+	while(true)
 	{
 		//TODO: check for BotMain shutdown message
-		auto UserMessage = GetUserInput();
+		auto UserMessage = GetStringInput();
 
-		lock(Messages->mutex);
-		Messages->queue->enqueue(UserMessage);
-		release(Messages->mutex);
+		if(UserMessage.length())
+		{
+			lock(Messages->mutex);
+			Messages->queue->enqueue("U" + UserMessage);
+			release(Messages->mutex);
+		}
 	}
 }
 
 //TODO: Create WriteToDebugOut or some other print_debug wrapper?
 void BotInit()
 {
-	WriteToGUIOut("BOT STARTING!");
+	WritelnToGUIOut("BOT STARTING!");
 
 	struct _stat buf;
 	YAML::Node config;
 	bool configChanged = false;
 
-	if (_stat("config.yaml", &buf) != 0)
+	if(_stat("config.yaml", &buf) != 0)
 	{
 		print_debug("config.yaml does not exist...generating with default configuration");
 
@@ -157,7 +219,7 @@ void BotInit()
 	SHOW_OPTIONS = config["SHOW_OPTIONS"].as<bool>();
 	SHOW_SALUTATIONS = config["SHOW_SALUTATIONS"].as<bool>();
 
-	if (SHOW_OPTIONS)
+	if(SHOW_OPTIONS)
 	{
 
 		//string listing current settings and asking the user whether they should be edited
@@ -175,22 +237,22 @@ void BotInit()
 				"Would you like to edit these settings? [Y/n]\r\n"
 				"(To disable this message, change SHOW_OPTIONS to false in irc.conf)";
 
-			WriteToGUIOut(initmenu);
+			WritelnToGUIOut(initmenu);
 			//TODO: migrate this to win32 platform layer
 
 			//check that the input is valid (either Y,y,N, or n)
 			//this can definitely be simplified but it works the way it is
-			while ((input = GetStringInput()).length() > 1 ||
+			while((input = GetStringInput()).length() > 1 ||
 				(input[0] != 'y' && input[0] != 'Y' && input[0] != 'n' && input[0] != 'N'))
 			{
 				//TODO: fix print_debug
 				//print_debug("ERROR: Invalid input.");
-				WriteToGUIOut("\r\nERROR: Invalid input.\r\n");
-				WriteToGUIOut(initmenu);
+				WritelnToGUIOut("\r\nERROR: Invalid input.\r\n");
+				WritelnToGUIOut(initmenu);
 			}
 
 			//if the input was Y or y show the field edit menu otherwise continue starting the bot
-			if (input[0] == 'y' || input[0] == 'Y')
+			if(input[0] == 'y' || input[0] == 'Y')
 			{
 				initLoop = true;
 				//string listing the current values of editable fields
@@ -208,57 +270,57 @@ void BotInit()
 					"4. Save changes and return\r\n"
 					"5. Cancel changes and return";
 
-				WriteToGUIOut(fields);
+				WritelnToGUIOut(fields);
 
 				//loop until the input is a valid character ('1','2', or '3')
-				while ((input = GetStringInput()).length() > 1 ||
+				while((input = GetStringInput()).length() > 1 ||
 					input[0] < '1' || input[0] > '5')
 				{
 					print_debug("ERROR: Invalid input.");
-					WriteToGUIOut(fields);
+					WritelnToGUIOut(fields);
 				}
 
 				//TODO: validate field edits to ensure they are valid
 
 				//switch based on the character the user input
-				switch (input[0])
+				switch(input[0])
 				{
 					//1. Channel
 				case '1':
-					WriteToGUIOut("What channel should be bot chat in?");
+					WritelnToGUIOut("What channel should be bot chat in?");
 					//convert channel name to lower case and prepend # to fit the twitch irc message formatting (see: https://github.com/justintv/Twitch-API/blob/master/IRC.md)
 					tempCHAN = GetStringInput();
-					WriteToGUIOut("Bot is now configured to join channel: " + tempCHAN);
+					WritelnToGUIOut("Bot is now configured to join channel: " + tempCHAN);
 					configChanged = true;
 					goto editfields;
 
 					//2. Username
 				case '2':
-					WriteToGUIOut("What is the bot's new username?");
+					WritelnToGUIOut("What is the bot's new username?");
 					//convert the username to lower case
 					tempNICK = GetStringInput();
 					//logging into the twitch irc requires a valid oauth token starting with "oauth:" (see link above)
-					WriteToGUIOut("What is the oath token for this username? (http://www.twitchapps.com/tmi/)");
+					WritelnToGUIOut("What is the oath token for this username? (http://www.twitchapps.com/tmi/)");
 
 					WriteToGUIIn(L"oauth:");
 
 					tempPASS = GetStringInput();
 					tempPASS = "oauth:" + tempPASS;
-					WriteToGUIOut("Bot is now configured to use the username: " + tempNICK);
+					WritelnToGUIOut("Bot is now configured to use the username: " + tempNICK);
 					configChanged = true;
 					goto editfields;
 
 					//3. Owner
 				case '3':
-					WriteToGUIOut("What is the username of the new administrator?");
+					WritelnToGUIOut("What is the username of the new administrator?");
 					tempOWNER = GetStringInput();
-					WriteToGUIOut("Bot administrator is now: " + tempOWNER);
+					WritelnToGUIOut("Bot administrator is now: " + tempOWNER);
 					configChanged = true;
 					goto editfields;
 
 					//4. Save changes and return
 				case '4':
-					WriteToGUIOut("Saving configuration changes");
+					WritelnToGUIOut("Saving configuration changes");
 					config["OWNER"] = tempOWNER;
 					config["NICK"] = tempNICK;
 					config["PASS"] = tempPASS;
@@ -276,10 +338,10 @@ void BotInit()
 					exit(1);
 				}
 			}
-		} while (initLoop);
+		} while(initLoop);
 
 	}
-	if (configChanged)
+	if(configChanged)
 	{
 		ofstream conffile("config.yaml");
 		conffile << config;
@@ -293,14 +355,5 @@ void BotInit()
 	STARTUP = config["STARTUP"].as<string>();
 	SHUTDOWN = config["SHUTDOWN"].as<string>();
 
-	WriteToGUIOut(L"\nBot initialized.");
-}
-
-//TODO: add args/overloads and move to platform layer
-void WriteToGUIIn(wchar_t *output)
-{
-	//write "oauth:" to the TextInput edit control and move the caret after it
-	SetWindowText(g_TextInput.handle, output);
-	SendMessage(g_TextInput.handle, EM_SETSEL, 0, MAKELONG(0xffff, 0xffff));
-	SendMessage(g_TextInput.handle, EM_SETSEL, -1, 0);
+	WritelnToGUIOut(L"\r\nBot initialized.\r\n");
 }

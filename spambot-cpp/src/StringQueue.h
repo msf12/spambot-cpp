@@ -13,7 +13,7 @@ struct StringQueue
 
 	Node *head = nullptr;
 	Node *tail = nullptr;
-	int size;
+	int size = 0;
 
 	~StringQueue();
 
