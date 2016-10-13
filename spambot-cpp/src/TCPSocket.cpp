@@ -57,7 +57,7 @@ string TCPSocket::receive()
 		}
 		else if(byteCountReceived == recvbuflen)
 		{
-			recvbuf[recvbuflen-1] = '\0';
+			recvbuf[recvbuflen] = '\0';
 		}
 		else
 		{
@@ -67,5 +67,19 @@ string TCPSocket::receive()
 		received.append(recvbuf);
 	} while(WSAGetLastError() == WSAEMSGSIZE);
 
+	return received;
+}
+
+string TCPSocket::receiveUntil(char *terminator, size_t length)
+{
+	auto received = receive();
+	if(WSAGetLastError() == WSAETIMEDOUT)
+	{
+		return "";
+	}
+	for(auto next_chunk = receive(); next_chunk != ""; next_chunk = receive())
+	{
+		received += next_chunk;
+	}
 	return received;
 }

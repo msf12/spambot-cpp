@@ -10,59 +10,59 @@ LRESULT CALLBACK MainWindowProc(
 	RECT ClientRect;
 	GetClientRect(Window, &ClientRect);
 	LRESULT Result = 0;
-	switch (Message)
+	switch(Message)
 	{
-	case WM_PAINT:
-	{
-		EnumChildWindows(Window, EnumWindowProc, (LPARAM)&ClientRect);
-		break;
-	} break;
-	case WM_CLOSE:
-	{
-		DestroyWindow(Window);
-	} break;
-	case WM_DESTROY:
-	{
-		PostQuitMessage(0);
-	} break;
-	case WM_CREATE:
-	{
-		g_TextOutput.handle = CreateWindow(
-			L"EDIT",
-			NULL,
-			WS_CHILD | WS_VISIBLE | ES_LEFT | WS_VSCROLL | ES_MULTILINE | ES_READONLY,
-			0, 0, 0, 0,
-			Window,
-			(HMENU)100,
-			(HINSTANCE)GetWindowLong(Window, -6), // gets the hInstance of Window
-			NULL
-		);
+		case WM_CLOSE:
+		{
+			DestroyWindow(Window);
+		} break;
+		case WM_DESTROY:
+		{
+			PostQuitMessage(0);
+		} break;
+		case WM_CREATE:
+		{
+			g_TextOutput.handle = CreateWindow(
+				L"EDIT",
+				NULL,
+				WS_CHILD | WS_VISIBLE | ES_LEFT | WS_VSCROLL | ES_MULTILINE | ES_READONLY,
+				0, 0, 0, 0,
+				Window,
+				(HMENU)100,
+				(HINSTANCE)GetWindowLong(Window, -6), // gets the hInstance of Window
+				NULL
+			);
 
-		g_TextInput.handle = CreateWindow(
-			L"EDIT",
-			NULL,
-			WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL,
-			0, 0, 0, 0,
-			Window,
-			(HMENU)101,
-			(HINSTANCE)GetWindowLong(Window, -6), // gets the hInstance of Window
-			NULL
-		);
+			g_TextInput.handle = CreateWindow(
+				L"EDIT",
+				NULL,
+				WS_CHILD | WS_VISIBLE | ES_LEFT | ES_AUTOHSCROLL,
+				0, 0, 0, 0,
+				Window,
+				(HMENU)101,
+				(HINSTANCE)GetWindowLong(Window, -6), // gets the hInstance of Window
+				NULL
+			);
 
-		SendMessage(g_TextInput.handle, EM_LIMITTEXT, 4000, 0);
+			SendMessage(g_TextInput.handle, EM_LIMITTEXT, 4000, 0);
 
-		SetWindowSubclass(g_TextInput.handle, InputWindowProc, 0, 0);
-		SetWindowSubclass(g_TextOutput.handle, OutputWindowProc, 0, 0);
-	} break;
-	case WM_SETFOCUS:
-	{
-		SetFocus(g_TextInput.handle);
-		return 0;
-	} break;
-	default:
-	{
-		Result = DefWindowProc(Window, Message, wParam, lParam);
-	}
+			SetWindowSubclass(g_TextInput.handle, InputWindowProc, 0, 0);
+			SetWindowSubclass(g_TextOutput.handle, OutputWindowProc, 0, 0);
+		} break;
+		case WM_SETFOCUS:
+		{
+			SetFocus(g_TextInput.handle);
+			return 0;
+		} break;
+		// TODO: Why do we need to use DefWindowProc after WM_PAINT?
+		case WM_PAINT:
+		{
+			EnumChildWindows(Window, EnumWindowProc, (LPARAM)&ClientRect);
+		}
+		default:
+		{
+			Result = DefWindowProc(Window, Message, wParam, lParam);
+		}
 	}
 
 	return Result;

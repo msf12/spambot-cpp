@@ -22,12 +22,12 @@ DWORD WINAPI PLATFORM_WRAPPER_NAME(function) ## (LPVOID args)\
 // Win32 specific implementation of platform-independent function headers
 void lock(void *mutex, unsigned long mstimeout = INFINITE)
 {
-	WaitForSingleObject(mutex, mstimeout);
+	WaitForSingleObject((HANDLE) mutex, mstimeout);
 }
 
 void release(void *mutex)
 {
-	ReleaseMutex(mutex);
+	ReleaseMutex((HANDLE) mutex);
 }
 
 void *InitMutex()
@@ -77,4 +77,62 @@ void WriteToGUIIn(wchar_t *output)
 	SetWindowText(g_TextInput.handle, output);
 	SendMessage(g_TextInput.handle, EM_SETSEL, 0, MAKELONG(0xffff, 0xffff));
 	SendMessage(g_TextInput.handle, EM_SETSEL, (unsigned int) -1, 0);
+}
+
+// Inline functions to wrap writing to the TextOutput
+inline auto WritelnToGUIOut(const wstring &s)
+{
+	g_OutputStringBuffer.add(s + L"\r\n");
+
+	// Write the output field
+	SetWindowText(g_TextOutput.handle, g_OutputStringBuffer.to_serial_string().c_str());
+	SendMessage(g_TextOutput.handle, WM_VSCROLL, SB_BOTTOM, NULL);
+}
+
+inline auto WritelnToGUIOut(wstring &&s)
+{
+	g_OutputStringBuffer.add(s + L"\r\n");
+
+	// Write the output field
+	SetWindowText(g_TextOutput.handle, g_OutputStringBuffer.to_serial_string().c_str());
+	SendMessage(g_TextOutput.handle, WM_VSCROLL, SB_BOTTOM, NULL);
+}
+
+inline auto WriteToGUIOut(const wstring &s)
+{
+	g_OutputStringBuffer.add(s);
+
+	// Write the output field
+	SetWindowText(g_TextOutput.handle, g_OutputStringBuffer.to_serial_string().c_str());
+	SendMessage(g_TextOutput.handle, WM_VSCROLL, SB_BOTTOM, NULL);
+}
+
+inline auto WriteToGUIOut(wstring &&s)
+{
+	g_OutputStringBuffer.add(s);
+
+	// Write the output field
+	SetWindowText(g_TextOutput.handle, g_OutputStringBuffer.to_serial_string().c_str());
+	SendMessage(g_TextOutput.handle, WM_VSCROLL, SB_BOTTOM, NULL);
+}
+
+inline void WritelnToGUIOut(const string &s)
+{
+	// http://stackoverflow.com/questions/4804298/how-to-convert-wstring-into-string
+	WritelnToGUIOut(StringToWString.from_bytes(s));
+}
+
+inline void WritelnToGUIOut(string &&s)
+{
+	WritelnToGUIOut(StringToWString.from_bytes(s));
+}
+
+inline void WriteToGUIOut(const string &s)
+{
+	WriteToGUIOut(StringToWString.from_bytes(s));
+}
+
+inline void WriteToGUIOut(string &&s)
+{
+	WriteToGUIOut(StringToWString.from_bytes(s));
 }

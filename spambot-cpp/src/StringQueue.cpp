@@ -21,6 +21,10 @@ string StringQueue::dequeue()
 {
 	if(size)
 	{
+		if(head == nullptr)
+		{
+			head->data = "This just broke";
+		}
 		Node *temp = head;
 		string result = temp->data;
 		head = head->next;

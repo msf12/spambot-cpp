@@ -1,5 +1,6 @@
 ﻿  win32_main.cpp
-d:\documents\github\spambot-cpp\spambot-cpp\src\spambot.cpp(22): warning C4189: 'UserInputThread': local variable is initialized but not referenced
-d:\documents\github\spambot-cpp\spambot-cpp\src\spambot.cpp(18): warning C4189: 'MessageHandlerThread': local variable is initialized but not referenced
+d:\documents\github\spambot-cpp\spambot-cpp\src\spambot_message.h(7): warning C4201: nonstandard extension used: nameless struct/union
+d:\documents\github\spambot-cpp\spambot-cpp\src\spambot.cpp(26): warning C4189: 'UserInputThread': local variable is initialized but not referenced
+d:\documents\github\spambot-cpp\spambot-cpp\src\spambot.cpp(22): warning C4189: 'MessageHandlerThread': local variable is initialized but not referenced
   spambot-cpp.vcxproj -> D:\Documents\GitHub\spambot-cpp\spambot-cpp\x64\Debug\spambot-cpp.exe
   spambot-cpp.vcxproj -> D:\Documents\GitHub\spambot-cpp\spambot-cpp\x64\Debug\spambot-cpp.pdb (Full PDB)

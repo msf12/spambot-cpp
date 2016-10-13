@@ -3,9 +3,13 @@
 #include <fstream>
 #include "spambot.h"
 #include "spambot_util.cpp"
+#include "spambot_message.cpp"
 
 void BotMain()
 {
+	// auto testmsg = InterpretMessage("@badges=staff/1,bits/1;bits=69420;color=#FF23BA;display-name=;emotes=;"
+	// 	"id=9428e2b3-615f-4728-9ed9-29995ebb2b52;mod=0;room-id=1337;sent-ts=1476320923316;subscriber=0;tmi-sent-ts=1476320936750;turbo=1;user-id=1337;user-type= "
+	// 	":twitch_username!twitch_username@twitch_username.tmi.twitch.tv PRIVMSG #channel :cheer100");
 	BotInit();
 
 	ThreadQueue *Messages = (ThreadQueue *) malloc(sizeof(ThreadQueue)*2);
@@ -29,20 +33,20 @@ void BotMain()
 
 	WritelnToGUIOut("Sending password...");
 	Socket.send("PASS " + PASS + "\r\n");
-	Socket.receive();
+	Socket.receiveUntil("\r\n", 2);
 	
 	WritelnToGUIOut("Sending username...");
 	Socket.send("NICK " + NICK + "\r\n");
-	Socket.receive();
+	Socket.receiveUntil("\r\n", 2);
 
 	WritelnToGUIOut("Requesting message tags");
 	Socket.send("CAP REQ :twitch.tv/tags\r\n");
-	Socket.receive();
+	Socket.receiveUntil("\r\n", 2);
 
 	WritelnToGUIOut("Joining channel " + CHAN + "...");
 	Socket.send("JOIN #" + CHAN + "\r\n");
-	Socket.receive();
-	Socket.receive();
+	Socket.receiveUntil("\r\n",2);
+	Socket.receiveUntil("\r\n",2);
 
 	WritelnToGUIOut("Bot connected successfully!");
 
@@ -70,12 +74,12 @@ void BotMain()
 			return;
 		}
 #endif
-		// TODO: should Socket.receive have a timeout?
-		for (auto received = Socket.receive();
+
+		for(auto received = Socket.receiveUntil("\r\n",2);
 			received != "";
-			received = Socket.receive())
+			received = Socket.receiveUntil("\r\n",2))
 		{
-			if (received == "PING")
+			if(received.substr(0,4) == "PING")
 			{
 				Socket.send("PONG :tmi.twitch.tv\r\n");
 			}
@@ -87,18 +91,13 @@ void BotMain()
 			}
 		}
 
-		if(Messages->queue->size)
-		{
-			lock(Responses->mutex);
-			Responses->queue->enqueue(Messages->queue->dequeue());
-			release(Responses->mutex);
-		}
-
+		lock(Responses->mutex);
 		if(Responses->queue->size)
 		{
-			Socket.send(FormatTwitchPRIVMSG(Responses->queue->dequeue()));
-			//WritelnToGUIOut(Responses->queue->dequeue());
+			//Socket.send(FormatTwitchPRIVMSG(Responses->queue->dequeue()));
+			WritelnToGUIOut(Responses->queue->dequeue());
 		}
+		release(Responses->mutex);
 
 #if 0
 		if (/*enough time has passed to rate-limit responses*/) //TODO: check if bot is mod in the channel???
@@ -125,27 +124,59 @@ void MessageHandler(void *args)
 		while(MessageQueue->size > 0)
 		{
 			lock(Messages->mutex);
-			auto message = MessageQueue->dequeue();
+			auto raw_message = MessageQueue->dequeue();
 			release(Messages->mutex);
 
-			auto response = message;// = ChooseResponse(message);
-			if(response[0] == 'U')
+			if (raw_message[0] == 'U')
 			{
-				response = response.substr(1);
+				lock(Responses->mutex);
+				ResponseQueue->enqueue(raw_message.substr(1));
+				release(Responses->mutex);
+			}
+			else if (raw_message[0] != '@')
+			{
+				// TODO: replace with WriteDebugOutput
+				WritelnToGUIOut(("MessageHandler Error: expected @\nFound: " + raw_message).c_str());
+			}
+			else if(raw_message.find("\r\n") != (raw_message.length() - 2))
+			{
+				// TODO: replace with WriteDebugOutput
+				WritelnToGUIOut(("MessageHandler Error: expected one message\nFound: " + raw_message).c_str());
+				for(size_t index = 0, marker = 0; index < raw_message.length();)
+				{
+					// NOTE: marker is set to the index AFTER \r\n for easier substring math
+					marker = raw_message.find("\r\n",index)+2;
+					auto raw_submessage = raw_message.substr(index, marker - index);
+
+					TwitchMessage message = {};
+					message = InterpretMessage(raw_submessage);
+
+					lock(Responses->mutex);
+					ResponseQueue->enqueue(/*ChooseResponse*/(message.text));
+					release(Responses->mutex);
+
+					index = marker;
+				}
 			}
 			else
 			{
-				WritelnToGUIOut(response);
-				continue;
-			}
+				TwitchMessage message = {};
+				message = InterpretMessage(raw_message);
 
-			lock(Responses->mutex);
-			ResponseQueue->enqueue(response);
-			release(Responses->mutex);
+				auto response = message.display_name + ": " + message.text + "  |  (" +
+					(message.mod ? "moderator:" : "-:") +
+					(message.subscriber ? "subscriber:" : "-:") +
+					(message.turbo ? "turbo" : "-") + ")";// = ChooseResponse(message);
+
+				lock(Responses->mutex);
+				ResponseQueue->enqueue(response);
+				release(Responses->mutex);
+			}
 		}
 	}
 }
 
+// TODO: WinHTTP follower notifications?
 #if 0
 void FollowerHandler(void *args)
 {
@@ -163,6 +194,7 @@ void FollowerHandler(void *args)
 		{
 			lock(Messages->mutex);
 			Messages->queue->enqueue("New follower message");
+			release(Messages->mutex)
 		}
 		//Sleep(/*1 minute*/); //TODO: determine ideal thread sleep time between follower checks
 	}
@@ -178,6 +210,8 @@ void UserInputHandler(void *args)
 		//TODO: check for BotMain shutdown message
 		auto UserMessage = GetStringInput();
 
+		// TODO: This is a hack and should be evaluated to see if it really is
+		// the best way to do things
 		if(UserMessage.length())
 		{
 			lock(Messages->mutex);
@@ -238,7 +272,6 @@ void BotInit()
 				"(To disable this message, change SHOW_OPTIONS to false in irc.conf)";
 
 			WritelnToGUIOut(initmenu);
-			//TODO: migrate this to win32 platform layer
 
 			//check that the input is valid (either Y,y,N, or n)
 			//this can definitely be simplified but it works the way it is
