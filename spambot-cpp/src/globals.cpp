@@ -9,8 +9,6 @@ bool SHOW_SALUTATIONS;
 string STARTUP;
 string SHUTDOWN;
 
-string CLIENT_ID = "5fehntp2gxyxi4zb9lu81mob2qrqb5u";
-
 TextWindow g_TextInput{ new char[4000], 4000 };
 TextWindow g_TextOutput{ new char[MAX_BUFFER_CHARS], MAX_BUFFER_CHARS };
 
@@ -42,19 +40,3 @@ wstring TextWindowBuffer::to_serial_string()
 }
 
 std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> StringToWString;
-
-// TODO: move to win32 platform layer
-void print_debug(char output[], bool error)
-{
-	static HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	if (error)
-	{
-		SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-	}
-	else
-	{
-		SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
-	}
-	printf("%s\n", output);
-	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
-}

@@ -45,15 +45,21 @@ int TCPSocket::send(string message)
 
 string TCPSocket::receive()
 {
-	string received;
+	string received = "";
+	int LastError;
 
 	do
 	{
 		auto byteCountReceived = recv(Socket, recvbuf, recvbuflen, 0);
+		LastError = WSAGetLastError();
 
-		if(byteCountReceived < 1)
+		if(byteCountReceived < 1 && LastError && LastError != WSAETIMEDOUT)
 		{
-			return "";
+			*(char *)0 = 0;
+		}
+		else if(byteCountReceived < 1)
+		{
+			break;
 		}
 		else if(byteCountReceived == recvbuflen)
 		{
@@ -65,7 +71,7 @@ string TCPSocket::receive()
 		}
 		
 		received.append(recvbuf);
-	} while(WSAGetLastError() == WSAEMSGSIZE);
+	} while(LastError == WSAEMSGSIZE);
 
 	return received;
 }

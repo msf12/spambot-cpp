@@ -54,7 +54,6 @@ LRESULT CALLBACK MainWindowProc(
 			SetFocus(g_TextInput.handle);
 			return 0;
 		} break;
-		// TODO: Why do we need to use DefWindowProc after WM_PAINT?
 		case WM_PAINT:
 		{
 			EnumChildWindows(Window, EnumWindowProc, (LPARAM)&ClientRect);

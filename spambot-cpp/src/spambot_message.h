@@ -1,3 +1,7 @@
+#define SECONDS_PER_DAY (60*60*24)
+#define SECONDS_PER_NON_LEAP_YEAR (SECONDS_PER_DAY * 365)
+#define SECONDS_PER_LEAP_YEAR (SECONDS_PER_NON_LEAP_YEAR + SECONDS_PER_DAY)
+
 union Color
 {
 	uint32_t hex;
@@ -46,6 +50,7 @@ struct Emote
 
 struct TwitchMessage
 {
+	// TODO: pull out tags into separate struct?
 	// bits100000, bits10000, bits5000, bits1000, bits100, bits1, broadcaster, turbo, subscriber, moderator, global_moderator, administrator, twitch_staff
 	uint16_t badges;
 	uint32_t bits;
@@ -55,10 +60,11 @@ struct TwitchMessage
 	string id;
 	uint16_t room_id;
 	bool mod, subscriber, turbo;
-	// TODO: set-ts, tmi-sent-ts
+	string sent_ts, tmi_sent_ts;
 	uint32_t user_id;
 	UserType user_type;
-	string username; // TODO: is this redundant?
+	// TODO: which of these fields are guaranteed?
+	string username; // This is not redundant because display_name is blank if never set
 	MessageType message_type;
 	string channel; // TODO: this is redundant and can probably be removed
 	string text;
@@ -112,4 +118,4 @@ struct TwitchMessage
 // Message after tags
 // :twitch_username!twitch_username@twitch_username.tmi.twitch.tv PRIVMSG #channel :cheer100
 
-TwitchMessage InterpretMessage(string raw_message);
+TwitchMessage InterpretChatMessage(string raw_message);

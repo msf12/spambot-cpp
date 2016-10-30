@@ -7,8 +7,9 @@ struct StringQueue
 {
 	struct Node
 	{
-		string data;
+		void *metadata;
 		Node *next = nullptr;
+		string data;
 	};
 
 	Node *head = nullptr;
@@ -18,5 +19,7 @@ struct StringQueue
 	~StringQueue();
 
 	void enqueue(string data);
+	void enqueue(string data, void *metadata);
+	void *peek_metadata();
 	string dequeue();
 };

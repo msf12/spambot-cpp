@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DEFECTS>
+  <DEFECT>
+    <SFA>
+      <FILEPATH>d:\documents\github\spambot-cpp\spambot-cpp\src\</FILEPATH>
+      <FILENAME>tcpsocket.cpp</FILENAME>
+      <LINE>7</LINE>
+      <COLUMN>11</COLUMN>
+    </SFA>
+    <DEFECTCODE>6031</DEFECTCODE>
+    <DESCRIPTION>Return value ignored: 'WSAStartup'.</DESCRIPTION>
+    <FUNCTION>TCPSocket::{ctor}</FUNCTION>
+    <DECORATED>??0TCPSocket@@QEAA@XZ</DECORATED>
+    <FUNCLINE>3</FUNCLINE>
+    <PATH></PATH>
+  </DEFECT>
+</DEFECTS>

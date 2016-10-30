@@ -12,6 +12,6 @@ struct ThreadQueue
 
 void BotMain();
 void MessageHandler(void *args);
-void FollowerHandler(void *args);
+void RestAPIHandler(void *args);
 void UserInputHandler(void *args);
 void BotInit();

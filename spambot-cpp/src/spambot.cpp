@@ -7,9 +7,6 @@
 
 void BotMain()
 {
-	// auto testmsg = InterpretMessage("@badges=staff/1,bits/1;bits=69420;color=#FF23BA;display-name=;emotes=;"
-	// 	"id=9428e2b3-615f-4728-9ed9-29995ebb2b52;mod=0;room-id=1337;sent-ts=1476320923316;subscriber=0;tmi-sent-ts=1476320936750;turbo=1;user-id=1337;user-type= "
-	// 	":twitch_username!twitch_username@twitch_username.tmi.twitch.tv PRIVMSG #channel :cheer100");
 	BotInit();
 
 	ThreadQueue *Messages = (ThreadQueue *) malloc(sizeof(ThreadQueue)*2);
@@ -20,9 +17,7 @@ void BotMain()
 	Responses->mutex = InitMutex();
 
 	auto MessageHandlerThread  = spawn_thread((void *) PLATFORM_WRAPPER_NAME(MessageHandler),   (void *)Messages);
-#if 0
-	auto FollowerHandlerThread = spawn_thread((void *) PLATFORM_WRAPPER_NAME(FollowerHandler),  (void *)Messages);
-#endif
+	auto RestAPIHandlerThread  = spawn_thread((void *) PLATFORM_WRAPPER_NAME(RestAPIHandler),  (void *)Messages);
 	auto UserInputThread       = spawn_thread((void *) PLATFORM_WRAPPER_NAME(UserInputHandler), (void *)Messages);
 
 	TCPSocket Socket("irc.twitch.tv", "6667");
@@ -41,6 +36,10 @@ void BotMain()
 
 	WritelnToGUIOut("Requesting message tags");
 	Socket.send("CAP REQ :twitch.tv/tags\r\n");
+	Socket.receiveUntil("\r\n", 2);
+
+	WritelnToGUIOut("Requesting additional commands and notices");
+	Socket.send("CAP REQ :twitch.tv/commands\r\n");
 	Socket.receiveUntil("\r\n", 2);
 
 	WritelnToGUIOut("Joining channel " + CHAN + "...");
@@ -63,7 +62,7 @@ void BotMain()
 		if (GetMessageWithTimeout())
 		{
 			PostMessage(MessageHandlerThread, 1);
-			PostMessage(FollowerHandlerThread, 1);
+			PostMessage(RestAPIHandlerThread, 1);
 			PostMessage(UserInputThread, 1);
 			GetMessage();
 			GetMessage();
@@ -79,23 +78,38 @@ void BotMain()
 			received != "";
 			received = Socket.receiveUntil("\r\n",2))
 		{
-			if(received.substr(0,4) == "PING")
+			if(!received.empty())
 			{
-				Socket.send("PONG :tmi.twitch.tv\r\n");
-			}
-			else
-			{
-				lock(Messages->mutex);
-				Messages->queue->enqueue(received);
-				release(Messages->mutex);
+				// NOTE: PING can technically be cut apart but it takes 2 missed PINGs to disconnect
+				// so I am leaving this for now out of laziness
+				if(received.substr(0,4) == "PING")
+				{
+					Socket.send("PONG :tmi.twitch.tv\r\n");
+				}
+				else
+				{
+					lock(Messages->mutex);
+					Messages->queue->enqueue(received, (void *) 0);
+					release(Messages->mutex);
+				}
 			}
 		}
 
 		lock(Responses->mutex);
 		if(Responses->queue->size)
 		{
-			//Socket.send(FormatTwitchPRIVMSG(Responses->queue->dequeue()));
-			WritelnToGUIOut(Responses->queue->dequeue());
+			size_t ResponseMetadata = (size_t)Responses->queue->peek_metadata();
+			string Response = Responses->queue->dequeue();
+
+			if(ResponseMetadata == 1 || ResponseMetadata == 2)
+			{
+				Socket.send(FormatTwitchPRIVMSG(Response));
+				WritelnToGUIOut(Response + "\r\n");
+			}
+			else
+			{
+				WritelnToGUIOut(Response);
+			}
 		}
 		release(Responses->mutex);
 
@@ -119,87 +133,157 @@ void MessageHandler(void *args)
 
 	while(true)
 	{
+		
 		// TODO: check for BotMain shutdown message
 		// TODO: use User input to activate commands
 		while(MessageQueue->size > 0)
 		{
 			lock(Messages->mutex);
+			// TODO: is this really the best way to do this?
+			size_t source_thread = (size_t)MessageQueue->peek_metadata();
 			auto raw_message = MessageQueue->dequeue();
 			release(Messages->mutex);
 
-			if (raw_message[0] == 'U')
+			switch(source_thread)
 			{
-				lock(Responses->mutex);
-				ResponseQueue->enqueue(raw_message.substr(1));
-				release(Responses->mutex);
-			}
-			else if (raw_message[0] != '@')
-			{
-				// TODO: replace with WriteDebugOutput
-				WritelnToGUIOut(("MessageHandler Error: expected @\nFound: " + raw_message).c_str());
-			}
-			else if(raw_message.find("\r\n") != (raw_message.length() - 2))
-			{
-				// TODO: replace with WriteDebugOutput
-				WritelnToGUIOut(("MessageHandler Error: expected one message\nFound: " + raw_message).c_str());
-				for(size_t index = 0, marker = 0; index < raw_message.length();)
+				// NOTE: BotMain Thread
+				case 0:
 				{
-					// NOTE: marker is set to the index AFTER \r\n for easier substring math
-					marker = raw_message.find("\r\n",index)+2;
-					auto raw_submessage = raw_message.substr(index, marker - index);
+					Assert(raw_message[0] == '@', "MessageHandler Error: expected @\nFound: " + raw_message)
+					if(raw_message.find("\r\n") != (raw_message.length() - 2))
+					{
+						// IMPORTANT: I have CONFIRMED that this happens in real life scenarios (such as during spam from multiple users)
+						WritelnToGUIOut(("MessageHandler Warning: expected one message\nFound: " + raw_message).c_str());
+						for(size_t index = 0, marker = 0; index < raw_message.length();)
+						{
+							// NOTE: marker is set to the index AFTER \r\n for easier substring math
+							marker = raw_message.find("\r\n",index)+2;
+							auto raw_submessage = raw_message.substr(index, marker - index);
 
-					TwitchMessage message = {};
-					message = InterpretMessage(raw_submessage);
+							TwitchMessage message = {};
+							message = InterpretChatMessage(raw_submessage);
 
+							lock(Responses->mutex);
+							ResponseQueue->enqueue(/*ChooseResponse*/(message.text));
+							release(Responses->mutex);
+
+							index = marker;
+						}
+					}
+					else
+					{
+						TwitchMessage message = {};
+						message = InterpretChatMessage(raw_message);
+
+						auto response = message.display_name + ": " + message.text + "  |  (" +
+							(message.mod ? "moderator:" : "-:") +
+							(message.subscriber ? "subscriber:" : "-:") +
+							(message.turbo ? "turbo" : "-") + ")";// = ChooseResponse(message);
+
+						lock(Responses->mutex);
+						ResponseQueue->enqueue(response, (void *) 0);
+						release(Responses->mutex);
+					}
+				} break;
+				// NOTE: UserInput Thread
+				case 1:
+				{
 					lock(Responses->mutex);
-					ResponseQueue->enqueue(/*ChooseResponse*/(message.text));
+					ResponseQueue->enqueue(raw_message, (void *) 1);
 					release(Responses->mutex);
+				} break;
+				// NOTE: RestAPIHandler Thread
+				case 2:
+				{
+					lock(Responses->mutex);
+					ResponseQueue->enqueue(raw_message, (void *) 2);
+					release(Responses->mutex);
+				} break;
+				default:
+					Assert(0, string("Invalid Thread Metadata"))
+			}
+		}
+	}
+}
 
-					index = marker;
+/*
+	TODO: Host notifications and new subcriptions must also be done via kraken
+	Subscribers: https://github.com/justintv/Twitch-API/blob/master/v3_resources/subscriptions.md
+	Hosts unknown atm???
+*/
+// TODO: WinHTTP follower, host, and new subscription notifications
+#include "json.hpp"
+#include "StringTrie.h"
+
+using nlohmann::json;
+
+void RestAPIHandler(void *args)
+{
+	ThreadQueue *Messages = (ThreadQueue *)args;
+	StringTrie FollowerList;
+	platform_http_vars TwitchAPIConnection = InitTwitchHTTPConnection();
+	wstring FollowerEndpoint = L"kraken/channels/" + StringToWString.from_bytes(CHAN) + L"/follows";
+	wstring cursor = L"";
+	uint64_t total;
+	string MostRecentFollowTime;
+	json j;
+
+	do
+	{
+		j = json::parse(MakeTwitchHTTPRequest(TwitchAPIConnection, FollowerEndpoint,
+		                                      wstring(L"?limit=100&cursor=" + cursor)).c_str());
+
+		auto test = j.dump(4);
+		if(j.find("_cursor") != j.end())
+		{
+			cursor = StringToWString.from_bytes(j["_cursor"].get<string>());
+		}
+		else
+		{
+			cursor = L"";
+		}
+
+		auto followers = j["follows"];
+		if (MostRecentFollowTime == "")
+		{
+			MostRecentFollowTime = followers[0]["created_at"].get<string>();
+		}
+
+		for(auto follower: followers)
+		{
+			FollowerList.add(follower["user"]["name"].get<string>());
+		}
+	} while(cursor != L"");
+	
+	total = j["_total"];
+	j.clear();
+	Assert(FollowerList.size() == total, string("FollowerList size was incorrect"))
+
+	while(true)
+	{
+		Sleep(1000 * 60);
+
+		auto FollowerPage = json::parse(MakeTwitchHTTPRequest(TwitchAPIConnection, FollowerEndpoint,
+		                                                      wstring(L"?limit=100&cursor=" + cursor)).c_str())["follows"];
+
+		for(auto Follower: FollowerPage)
+		{
+			if(Follower["created_at"] >= MostRecentFollowTime)
+			{
+				if(FollowerList.add(Follower["user"]["name"].get<string>()))
+				{
+					lock(Messages->mutex);
+					Messages->queue->enqueue(("Thank you for following, " + Follower["user"]["display_name"].get<string>() + "!"), (void *) 2);
+					release(Messages->mutex);
 				}
 			}
 			else
 			{
-				TwitchMessage message = {};
-				message = InterpretMessage(raw_message);
-
-				auto response = message.display_name + ": " + message.text + "  |  (" +
-					(message.mod ? "moderator:" : "-:") +
-					(message.subscriber ? "subscriber:" : "-:") +
-					(message.turbo ? "turbo" : "-") + ")";// = ChooseResponse(message);
-
-				lock(Responses->mutex);
-				ResponseQueue->enqueue(response);
-				release(Responses->mutex);
+				break;
 			}
 		}
 	}
 }
-
-// TODO: WinHTTP follower notifications?
-#if 0
-void FollowerHandler(void *args)
-{
-	ThreadQueue *Messages = (ThreadQueue *)args;
-
-	auto LastNewFollowerTime = GetMostRecentFollowTime();
-
-	//TODO: figure out message timings vs check timings
-	while(true)
-	{
-		//TODO: check for BotMain shutdown message
-		auto NewFollowers = GetNewFollowers(LastNewFollowerTime);
-		LastNewFollowerTime = NewFollowers[0].GetField("updated_at");
-		for(auto follower : NewFollowers)
-		{
-			lock(Messages->mutex);
-			Messages->queue->enqueue("New follower message");
-			release(Messages->mutex)
-		}
-		//Sleep(/*1 minute*/); //TODO: determine ideal thread sleep time between follower checks
-	}
-}
-#endif
 
 void UserInputHandler(void *args)
 {
@@ -210,18 +294,15 @@ void UserInputHandler(void *args)
 		//TODO: check for BotMain shutdown message
 		auto UserMessage = GetStringInput();
 
-		// TODO: This is a hack and should be evaluated to see if it really is
-		// the best way to do things
 		if(UserMessage.length())
 		{
 			lock(Messages->mutex);
-			Messages->queue->enqueue("U" + UserMessage);
+			Messages->queue->enqueue(UserMessage, (void *) 1);
 			release(Messages->mutex);
 		}
 	}
 }
 
-//TODO: Create WriteToDebugOut or some other print_debug wrapper?
 void BotInit()
 {
 	WritelnToGUIOut("BOT STARTING!");
@@ -232,7 +313,7 @@ void BotInit()
 
 	if(_stat("config.yaml", &buf) != 0)
 	{
-		print_debug("config.yaml does not exist...generating with default configuration");
+		WriteToDebugOut("config.yaml does not exist...generating with default configuration");
 
 		config["OWNER"] = "default_owner";
 		config["NICK"] = "default_account";
@@ -278,8 +359,7 @@ void BotInit()
 			while((input = GetStringInput()).length() > 1 ||
 				(input[0] != 'y' && input[0] != 'Y' && input[0] != 'n' && input[0] != 'N'))
 			{
-				//TODO: fix print_debug
-				//print_debug("ERROR: Invalid input.");
+				WriteToDebugOut("ERROR: Invalid input.");
 				WritelnToGUIOut("\r\nERROR: Invalid input.\r\n");
 				WritelnToGUIOut(initmenu);
 			}
@@ -309,7 +389,7 @@ void BotInit()
 				while((input = GetStringInput()).length() > 1 ||
 					input[0] < '1' || input[0] > '5')
 				{
-					print_debug("ERROR: Invalid input.");
+					WriteToDebugOut("ERROR: Invalid input.");
 					WritelnToGUIOut(fields);
 				}
 
@@ -367,8 +447,7 @@ void BotInit()
 
 					//seriously, if the code ever ends up here, I don't even know what could have gone wrong
 				default:
-					print_debug("ERROR: If you are seeing this something has gone very wrong", true);
-					exit(1);
+					Assert(0, string("ERROR: If you are seeing this something has gone very wrong"))
 				}
 			}
 		} while(initLoop);

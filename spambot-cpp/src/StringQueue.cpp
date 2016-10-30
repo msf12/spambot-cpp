@@ -17,6 +17,12 @@ void StringQueue::enqueue(string data)
 	++size;
 }
 
+void StringQueue::enqueue(string data, void *metadata)
+{
+	StringQueue::enqueue(data);
+	tail->metadata = metadata;
+}
+
 string StringQueue::dequeue()
 {
 	if(size)
@@ -36,6 +42,11 @@ string StringQueue::dequeue()
 	{
 		return "";
 	}
+}
+
+void * StringQueue::peek_metadata()
+{
+	return head->metadata;
 }
 
 StringQueue::~StringQueue()

@@ -40,6 +40,7 @@ int CALLBACK WinMain(
 	if(registerClassReturn == NULL)
 	{
 		//TODO: log errors
+		*(char *)0;
 		return 0;
 	}
 
@@ -81,6 +82,6 @@ int CALLBACK WinMain(
 	OutputDebugString(g_OutputStringBuffer.to_serial_string().c_str());
 
 	WriteToGUIOut(L"Bot terminated. ");
-	_CrtDumpMemoryLeaks();
+	//_CrtDumpMemoryLeaks();
 	return 0;
 }

@@ -1,4 +1,5 @@
 #pragma once
+#define Assert(Condition, Output) if(!(Condition)) { WriteToDebugOut(" [ASSERT FAILED] - " + (Output)); *((int *)0) = 0; }
 
 #include <string>
 #include <iostream>
@@ -40,16 +41,8 @@ extern bool SHOW_SALUTATIONS;
 extern string STARTUP;
 extern string SHUTDOWN;
 
-extern string CLIENT_ID;
-
-//TODO: is there a way to make these local to the first thread?
 extern TextWindow g_TextInput;
 extern TextWindow g_TextOutput;
-
-//TODO: comment why this exists
 extern TextWindowBuffer g_OutputStringBuffer;
 
 extern std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> StringToWString;
-
-//TODO: implement colored text for notices and errors and rename/reimpliment this function
-void print_debug(char output[], bool error = false);
